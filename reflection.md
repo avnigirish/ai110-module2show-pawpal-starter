@@ -6,39 +6,39 @@
 
 - Briefly describe your initial UML design.
 
-The design uses five classes arranged in a clear ownership chain: `Owner` holds a reference to one `Pet`, and `Pet` owns a list of `Task` objects. A separate `Scheduler` class reads from `Owner` (for the time budget) and `Pet` (for the task list) and produces a `DailyPlan` as output. This separation keeps data (Owner, Pet, Task) cleanly apart from logic (Scheduler) and output (DailyPlan). `Task` and `Pet` are implemented as Python dataclasses since they are primarily data containers; `Owner`, `Scheduler`, and `DailyPlan` are regular classes because they involve more stateful or behavioral logic.
+    - The design uses five classes arranged in a clear ownership chain: `Owner` holds a reference to one `Pet`, and `Pet` owns a list of `Task` objects. A separate `Scheduler` class reads from `Owner` (for the time budget) and `Pet` (for the task list) and produces a `DailyPlan` as output. This separation keeps data (Owner, Pet, Task) cleanly apart from logic (Scheduler) and output (DailyPlan). `Task` and `Pet` are implemented as Python dataclasses since they are primarily data containers; `Owner`, `Scheduler`, and `DailyPlan` are regular classes because they involve more stateful or behavioral logic.
 
-The three core actions a user should be able to perform in PawPal+ are:
+    The three core actions a user should be able to perform in PawPal+ are:
 
-1. **Set up an owner and pet profile** — The user enters basic information about themselves (the owner) and their pet (name, species, age, etc.). This gives the scheduler the context it needs to tailor care recommendations.
+    1. **Set up an owner and pet profile** — The user enters basic information about themselves (the owner) and their pet (name, species, age, etc.). This gives the scheduler the context it needs to tailor care recommendations.
 
-2. **Add and manage care tasks** — The user creates, edits, and removes pet care tasks such as walks, feedings, medication, grooming, and enrichment. Each task has at minimum a duration and a priority level so the scheduler knows how much time each requires and how important it is.
+    2. **Add and manage care tasks** — The user creates, edits, and removes pet care tasks such as walks, feedings, medication, grooming, and enrichment. Each task has at minimum a duration and a priority level so the scheduler knows how much time each requires and how important it is.
 
-3. **Generate and view a daily schedule** — The user requests a daily plan. The scheduler considers the available time window, task priorities, and any preferences or constraints, then produces an ordered schedule and explains why it chose that plan.
+    3. **Generate and view a daily schedule** — The user requests a daily plan. The scheduler considers the available time window, task priorities, and any preferences or constraints, then produces an ordered schedule and explains why it chose that plan.
 
 - What classes did you include, and what responsibilities did you assign to each?
 
-The system is built around five main objects:
+    - The system is built around five main objects:
 
-**Owner**
-- Holds: `name` (str), `available_minutes` (int — total daily time budget in minutes)
-- Can: `add_pet(pet)`, `get_pet()` — manages the association between the owner and their pet
+    **Owner**
+    - Holds: `name` (str), `available_minutes` (int — total daily time budget in minutes)
+    - Can: `add_pet(pet)`, `get_pet()` — manages the association between the owner and their pet
 
-**Pet**
-- Holds: `name` (str), `species` (str), `age` (int), `breed` (str, optional)
-- Can: `add_task(task)`, `remove_task(task)`, `get_tasks()` — owns the list of care tasks assigned to this pet
+    **Pet**
+    - Holds: `name` (str), `species` (str), `age` (int), `breed` (str, optional)
+    - Can: `add_task(task)`, `remove_task(task)`, `get_tasks()` — owns the list of care tasks assigned to this pet
 
-**Task**
-- Holds: `name` (str), `category` (str — e.g. walk, feed, meds, grooming, enrichment), `duration_minutes` (int), `priority` (int 1–5, where 5 is most urgent), `preferred_time` (str, optional — e.g. "morning", "evening")
-- Can: `update(**kwargs)`, `__repr__()` — encapsulates everything the scheduler needs to know about one care activity
+    **Task**
+    - Holds: `name` (str), `category` (str — e.g. walk, feed, meds, grooming, enrichment), `duration_minutes` (int), `priority` (int 1–5, where 5 is most urgent), `preferred_time` (str, optional — e.g. "morning", "evening")
+    - Can: `update(**kwargs)`, `__repr__()` — encapsulates everything the scheduler needs to know about one care activity
 
-**Scheduler**
-- Holds: `pet` (Pet), `owner` (Owner), `tasks` (list of Task)
-- Can: `generate_schedule()` — produces a DailyPlan by sorting tasks and fitting them within the owner's time budget; `sort_tasks_by_priority()` — orders tasks highest-priority first; `explain_plan(plan)` — returns a human-readable explanation of scheduling decisions
+    **Scheduler**
+    - Holds: `pet` (Pet), `owner` (Owner), `tasks` (list of Task)
+    - Can: `generate_schedule()` — produces a DailyPlan by sorting tasks and fitting them within the owner's time budget; `sort_tasks_by_priority()` — orders tasks highest-priority first; `explain_plan(plan)` — returns a human-readable explanation of scheduling decisions
 
-**DailyPlan**
-- Holds: `date` (str), `scheduled_tasks` (list of Task — those that fit), `unscheduled_tasks` (list of Task — those that didn't fit in the time budget), `explanation` (str)
-- Can: `display()` — formats the plan for the UI; `get_summary()` — returns a short text summary of what was scheduled and what was skipped
+    **DailyPlan**
+    - Holds: `date` (str), `scheduled_tasks` (list of Task — those that fit), `unscheduled_tasks` (list of Task — those that didn't fit in the time budget), `explanation` (str)
+    - Can: `display()` — formats the plan for the UI; `get_summary()` — returns a short text summary of what was scheduled and what was skipped
 
 **UML Class Diagram**
 
@@ -101,7 +101,7 @@ Reviewing `pawpal_system.py`, one potential logic bottleneck stands out: `Schedu
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
 
-Yes. Based on the AI feedback above, `Scheduler.__init__` was simplified to accept only `owner` as an argument. The `pet` is now derived inside the constructor via `owner.get_pet()`. This change was made because passing `pet` separately was redundant — `Owner` already owns the pet — and introduced a risk of mismatched arguments. Removing the redundant parameter makes the API harder to misuse and better reflects the actual ownership structure of the model.
+    - Yes. Based on the AI feedback above, `Scheduler.__init__` was simplified to accept only `owner` as an argument. The `pet` is now derived inside the constructor via `owner.get_pet()`. This change was made because passing `pet` separately was redundant — `Owner` already owns the pet — and introduced a risk of mismatched arguments. Removing the redundant parameter makes the API harder to misuse and better reflects the actual ownership structure of the model.
 
 ---
 
@@ -115,7 +115,13 @@ Yes. Based on the AI feedback above, `Scheduler.__init__` was simplified to acce
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
+    - **Conflict detection only flags tasks that have an explicit `preferred_time`.**
+    - The `detect_conflicts` method builds intervals only for tasks where `preferred_time` is set (e.g. `"07:00"`). Tasks without a preferred time are assigned sequentially by a time cursor in `_assign_times` and are never checked for overlap against each other or against timed tasks.
+    - This means a task scheduled by the cursor could land inside a window already claimed by a preferred-time task, and no warning would be generated for that collision.
+
 - Why is that tradeoff reasonable for this scenario?
+    - Pet care tasks that have no time preference (e.g. "Brush fur") are flexible by definition — the owner is explicitly saying "fit this wherever." Flagging those as conflicts would produce noise rather than actionable warnings. The meaningful conflicts are when an owner explicitly requests two tasks at the same clock time (e.g., a walk and a feeding both at `"07:00"`), which is exactly what the current check catches. A fully general solution would require solving a constraint-satisfaction problem, which is far more complexity than a daily pet care planner needs.
+
 
 ---
 
