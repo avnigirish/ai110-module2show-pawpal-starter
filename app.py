@@ -21,6 +21,15 @@ elif st.session_state.tasks and isinstance(st.session_state.tasks[0], dict):
     # Clear stale dict-based tasks left over from the old starter code.
     st.session_state.tasks = []
 
+# Map human-readable time labels to HH:MM strings the Scheduler expects.
+# The backend's _hhmm_to_min() uses "HH:MM" format; passing "morning" would crash.
+TIME_LABEL_TO_HHMM = {
+    "morning":   "08:00",
+    "afternoon": "13:00",
+    "evening":   "18:00",
+    "any":       None,
+}
+
 # ---------------------------------------------------------------------------
 # Page header
 # ---------------------------------------------------------------------------
@@ -79,18 +88,22 @@ with col3:
 with col4:
     priority_label = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 with col5:
-    preferred_time = st.selectbox("Preferred time", ["any", "morning", "afternoon", "evening"])
+    preferred_time_label = st.selectbox("Preferred time", ["any", "morning", "afternoon", "evening"])
 
 if st.button("Add task"):
     if st.session_state.pet is None:
         st.warning("Save a profile first before adding tasks.")
     else:
+        # Convert the human-readable label ("morning") to the HH:MM format
+        # that Scheduler._hhmm_to_min() and detect_conflicts() expect.
+        hhmm = TIME_LABEL_TO_HHMM[preferred_time_label]
+
         task = Task(
             name=task_name,
             category=category,
             duration_minutes=int(duration),
             priority=PRIORITY_MAP[priority_label],
-            preferred_time=None if preferred_time == "any" else preferred_time,
+            preferred_time=hhmm,
         )
         # Pet.add_task() from pawpal_system.py — this is what stores the task
         # on the Pet object that the Scheduler will later read from.
@@ -98,23 +111,64 @@ if st.button("Add task"):
         st.session_state.tasks.append(task)
         st.success(f"Added: {task_name} ({duration} min, priority {PRIORITY_MAP[priority_label]})")
 
+# ---- Task list with sort/filter controls --------------------------------
 if st.session_state.tasks:
-    st.write("Current tasks:")
+    # Build a temporary Scheduler so we can use its sort/filter methods here.
+    # This doesn't generate a schedule — it just gives us access to the methods
+    # like sort_tasks_by_priority() and filter_by_status() from pawpal_system.py.
+    _sched = Scheduler(st.session_state.owner)
+
+    sort_col, filter_col = st.columns(2)
+    with sort_col:
+        sort_mode = st.radio(
+            "Sort by", ["Priority (high → low)", "Time of day"],
+            horizontal=True, label_visibility="collapsed"
+        )
+    with filter_col:
+        show_filter = st.radio(
+            "Show", ["All tasks", "Pending only", "Completed only"],
+            horizontal=True, label_visibility="collapsed"
+        )
+
+    # Use Scheduler methods to sort — these are the Phase 3 backend methods.
+    if sort_mode == "Priority (high → low)":
+        display_tasks = _sched.sort_tasks_by_priority()   # <-- Scheduler.sort_tasks_by_priority()
+    else:
+        display_tasks = _sched.sort_by_time()             # <-- Scheduler.sort_by_time()
+
+    # Apply status filter via Scheduler.filter_by_status().
+    if show_filter == "Pending only":
+        display_tasks = [t for t in display_tasks if not t.completed]
+    elif show_filter == "Completed only":
+        display_tasks = [t for t in display_tasks if t.completed]
+
+    # Map HH:MM back to a readable label for display.
+    HHMM_TO_LABEL = {v: k for k, v in TIME_LABEL_TO_HHMM.items() if v is not None}
+
+    # Render as a structured table so columns are easy to scan.
+    table_rows = []
+    for task in display_tasks:
+        time_display = HHMM_TO_LABEL.get(task.preferred_time, "any") if task.preferred_time else "any"
+        priority_display = {1: "Low", 3: "Medium", 5: "High"}.get(task.priority, str(task.priority))
+        status_display = "Done" if task.completed else "Pending"
+        table_rows.append({
+            "Task":      ("~~" + task.name + "~~") if task.completed else task.name,
+            "Category":  task.category,
+            "Duration":  f"{task.duration_minutes} min",
+            "Priority":  priority_display,
+            "Time":      time_display,
+            "Status":    status_display,
+        })
+
+    st.table(table_rows)
+
+    # Inline Done checkboxes (below the table, indexed to match session_state.tasks order).
+    st.caption("Mark tasks complete:")
     for i, task in enumerate(st.session_state.tasks):
-        col_check, col_info = st.columns([1, 9])
-        with col_check:
-            # Checkbox calls task.mark_complete() — the method from pawpal_system.py.
-            # Streamlit re-renders the row immediately after the state change.
-            done = st.checkbox("Done", value=task.completed, key=f"task_done_{i}")
-            if done and not task.completed:
-                task.mark_complete()   # <-- Task.mark_complete()
-        with col_info:
-            label = f"~~{task.name}~~" if task.completed else task.name
-            st.markdown(
-                f"{label} — {task.category}, {task.duration_minutes} min, "
-                f"priority {task.priority}"
-                + (f", {task.preferred_time}" if task.preferred_time else "")
-            )
+        done = st.checkbox(task.name, value=task.completed, key=f"task_done_{i}")
+        if done and not task.completed:
+            task.mark_complete()   # <-- Task.mark_complete()
+            st.rerun()
 else:
     st.info("No tasks yet. Add one above.")
 
@@ -132,10 +186,70 @@ if st.button("Generate schedule"):
         st.warning("Add at least one task before generating a schedule.")
     else:
         scheduler = Scheduler(st.session_state.owner)
-        plan = scheduler.generate_schedule()
+        plan = scheduler.generate_schedule()   # <-- Scheduler.generate_schedule()
 
-        st.success(plan.get_summary())
-        st.text(plan.display())
+        # ---- Top-level summary ------------------------------------------
+        if plan.unscheduled_tasks:
+            st.warning(plan.get_summary())
+        else:
+            st.success(plan.get_summary())
 
+        # ---- Conflict warnings — shown prominently so the owner can act --
+        # detect_conflicts() flags tasks whose preferred windows overlap.
+        # Each warning names the two tasks and their exact time windows so the
+        # owner knows exactly which walks or feeding times to reschedule.
+        if plan.warnings:
+            st.error(
+                f"**{len(plan.warnings)} scheduling conflict(s) detected — "
+                "please adjust the preferred times below.**"
+            )
+            for warning in plan.warnings:
+                st.warning(f"**Conflict:** {warning}")
+            st.caption(
+                "Tip: Go back to Step 2, remove the conflicting tasks, and re-add them "
+                "with different preferred times. PawPal+ will schedule them back-to-back "
+                "automatically, but the times shown may differ from what you requested."
+            )
+
+        # ---- Scheduled tasks — rich table with time slots ---------------
+        if plan.scheduled_tasks:
+            st.markdown("**Scheduled tasks**")
+
+            def _min_to_ampm(minutes: int) -> str:
+                """Convert minutes-from-midnight to a readable 12-hour string."""
+                h, m = divmod(minutes, 60)
+                suffix = "AM" if h < 12 else "PM"
+                h12 = h % 12 or 12
+                return f"{h12}:{m:02d} {suffix}"
+
+            scheduled_rows = []
+            for task in plan.scheduled_tasks:
+                time_slot = (
+                    f"{_min_to_ampm(task.start_min)} – {_min_to_ampm(task.end_min)}"
+                    if task.start_min is not None else "—"
+                )
+                priority_label_display = {1: "Low", 3: "Medium", 5: "High"}.get(
+                    task.priority, str(task.priority)
+                )
+                scheduled_rows.append({
+                    "Time slot":  time_slot,
+                    "Task":       task.name,
+                    "Category":   task.category,
+                    "Duration":   f"{task.duration_minutes} min",
+                    "Priority":   priority_label_display,
+                    "Done?":      "Yes" if task.completed else "No",
+                })
+
+            st.table(scheduled_rows)
+
+        # ---- Unscheduled tasks — shown as a warning so they stand out ---
+        if plan.unscheduled_tasks:
+            skipped_names = ", ".join(t.name for t in plan.unscheduled_tasks)
+            st.warning(
+                f"**Not enough time for:** {skipped_names}. "
+                f"Increase your available time in Step 1, or shorten/remove lower-priority tasks."
+            )
+
+        # ---- Why this plan? expander ------------------------------------
         with st.expander("Why this plan?"):
             st.text(plan.explanation)
