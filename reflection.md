@@ -5,7 +5,90 @@
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+
+The three core actions a user should be able to perform in PawPal+ are:
+
+1. **Set up an owner and pet profile** — The user enters basic information about themselves (the owner) and their pet (name, species, age, etc.). This gives the scheduler the context it needs to tailor care recommendations.
+
+2. **Add and manage care tasks** — The user creates, edits, and removes pet care tasks such as walks, feedings, medication, grooming, and enrichment. Each task has at minimum a duration and a priority level so the scheduler knows how much time each requires and how important it is.
+
+3. **Generate and view a daily schedule** — The user requests a daily plan. The scheduler considers the available time window, task priorities, and any preferences or constraints, then produces an ordered schedule and explains why it chose that plan.
+
 - What classes did you include, and what responsibilities did you assign to each?
+
+The system is built around five main objects:
+
+**Owner**
+- Holds: `name` (str), `available_minutes` (int — total daily time budget in minutes)
+- Can: `add_pet(pet)`, `get_pet()` — manages the association between the owner and their pet
+
+**Pet**
+- Holds: `name` (str), `species` (str), `age` (int), `breed` (str, optional)
+- Can: `add_task(task)`, `remove_task(task)`, `get_tasks()` — owns the list of care tasks assigned to this pet
+
+**Task**
+- Holds: `name` (str), `category` (str — e.g. walk, feed, meds, grooming, enrichment), `duration_minutes` (int), `priority` (int 1–5, where 5 is most urgent), `preferred_time` (str, optional — e.g. "morning", "evening")
+- Can: `update(**kwargs)`, `__repr__()` — encapsulates everything the scheduler needs to know about one care activity
+
+**Scheduler**
+- Holds: `pet` (Pet), `owner` (Owner), `tasks` (list of Task)
+- Can: `generate_schedule()` — produces a DailyPlan by sorting tasks and fitting them within the owner's time budget; `sort_tasks_by_priority()` — orders tasks highest-priority first; `explain_plan(plan)` — returns a human-readable explanation of scheduling decisions
+
+**DailyPlan**
+- Holds: `date` (str), `scheduled_tasks` (list of Task — those that fit), `unscheduled_tasks` (list of Task — those that didn't fit in the time budget), `explanation` (str)
+- Can: `display()` — formats the plan for the UI; `get_summary()` — returns a short text summary of what was scheduled and what was skipped
+
+**UML Class Diagram**
+
+```mermaid
+classDiagram
+    class Owner {
+        +str name
+        +int available_minutes
+        +add_pet(pet)
+        +get_pet()
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +int age
+        +str breed
+        +add_task(task)
+        +remove_task(task)
+        +get_tasks()
+    }
+
+    class Task {
+        +str name
+        +str category
+        +int duration_minutes
+        +int priority
+        +str preferred_time
+        +update(**kwargs)
+    }
+
+    class Scheduler {
+        +generate_schedule()
+        +sort_tasks_by_priority()
+        +explain_plan(plan)
+    }
+
+    class DailyPlan {
+        +str date
+        +str explanation
+        +display()
+        +get_summary()
+    }
+
+    Owner "1" --> "1" Pet : owns
+    Pet "1" --> "0..*" Task : has
+    Scheduler --> Owner : uses
+    Scheduler --> Pet : uses
+    Scheduler --> DailyPlan : produces
+    DailyPlan "1" --> "0..*" Task : scheduled_tasks
+    DailyPlan "1" --> "0..*" Task : unscheduled_tasks
+```
 
 **b. Design changes**
 
