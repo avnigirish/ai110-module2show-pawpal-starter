@@ -6,6 +6,8 @@
 
 - Briefly describe your initial UML design.
 
+The design uses five classes arranged in a clear ownership chain: `Owner` holds a reference to one `Pet`, and `Pet` owns a list of `Task` objects. A separate `Scheduler` class reads from `Owner` (for the time budget) and `Pet` (for the task list) and produces a `DailyPlan` as output. This separation keeps data (Owner, Pet, Task) cleanly apart from logic (Scheduler) and output (DailyPlan). `Task` and `Pet` are implemented as Python dataclasses since they are primarily data containers; `Owner`, `Scheduler`, and `DailyPlan` are regular classes because they involve more stateful or behavioral logic.
+
 The three core actions a user should be able to perform in PawPal+ are:
 
 1. **Set up an owner and pet profile** — The user enters basic information about themselves (the owner) and their pet (name, species, age, etc.). This gives the scheduler the context it needs to tailor care recommendations.
@@ -90,10 +92,16 @@ classDiagram
     DailyPlan "1" --> "0..*" Task : unscheduled_tasks
 ```
 
+**AI feedback on the design**
+
+Reviewing `pawpal_system.py`, one potential logic bottleneck stands out: `Scheduler.__init__` currently takes both `owner` and `pet` as separate arguments, but `Owner` already holds the pet via `get_pet()`. This creates a redundant dependency — a caller could accidentally pass a `pet` that doesn't belong to the given `owner`, which would silently produce a wrong schedule. A cleaner design would have `Scheduler` accept only `owner` and derive the pet internally via `owner.get_pet()`. This enforces the ownership relationship that already exists in the model.
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+Yes. Based on the AI feedback above, `Scheduler.__init__` was simplified to accept only `owner` as an argument. The `pet` is now derived inside the constructor via `owner.get_pet()`. This change was made because passing `pet` separately was redundant — `Owner` already owns the pet — and introduced a risk of mismatched arguments. Removing the redundant parameter makes the API harder to misuse and better reflects the actual ownership structure of the model.
 
 ---
 
