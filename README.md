@@ -54,6 +54,31 @@ Beyond the core priority-based planner, PawPal+ includes several logic improveme
 
 ---
 
+## Testing PawPal+
+
+### Run the test suite
+
+```bash
+python -m pytest tests/test_pawpal.py -v
+```
+
+### What the tests cover
+
+| Area | Tests | What is verified |
+|---|---|---|
+| **Sorting** | `test_sort_by_time_chronological_order`, `test_sort_by_time_none_times_last` | Tasks with `preferred_time` are returned in ascending HH:MM order; tasks with no time sort last |
+| **Recurrence** | `test_daily_recurrence_advances_one_day`, `test_weekly_recurrence_advances_seven_days`, `test_mark_task_complete_adds_recurrence_to_pet`, `test_non_recurring_task_returns_none` | Daily tasks advance 1 day, weekly tasks advance 7 days, the new occurrence is appended to the correct pet, and non-recurring tasks return `None` |
+| **Conflict detection** | `test_conflict_detected_for_same_time`, `test_no_conflict_for_sequential_tasks`, `test_no_conflict_for_tasks_without_preferred_time` | Overlapping `preferred_time` windows produce a warning; sequential and flexible tasks produce none |
+| **Core model** | `test_mark_complete_changes_status`, `test_add_task_increases_pet_task_count` | `Task.mark_complete()` flips the flag; `Pet.add_task()` grows the task list |
+
+### Confidence Level
+
+**4 / 5 stars**
+
+The scheduler's sorting, recurrence, and conflict-detection logic is well-covered and all 11 tests pass. One star is held back because `generate_schedule` (the full greedy planner end-to-end, including time-budget exhaustion and the Streamlit UI layer) does not yet have dedicated tests.
+
+---
+
 ### Suggested workflow
 
 1. Read the scenario carefully and identify requirements and edge cases.
