@@ -13,12 +13,14 @@ class Task:
     completed: bool = False
 
     def update(self, **kwargs):
+        """Update one or more task attributes by keyword; raises AttributeError for unknown fields."""
         for key, value in kwargs.items():
             if not hasattr(self, key):
                 raise AttributeError(f"Task has no attribute '{key}'")
             setattr(self, key, value)
 
     def mark_complete(self):
+        """Mark this task as completed."""
         self.completed = True
 
 
@@ -31,12 +33,15 @@ class Pet:
     _tasks: list = field(default_factory=list, repr=False)
 
     def add_task(self, task: Task):
+        """Add a care task to this pet's task list."""
         self._tasks.append(task)
 
     def remove_task(self, task: Task):
+        """Remove a task from this pet's task list; raises ValueError if not found."""
         self._tasks.remove(task)
 
     def get_tasks(self) -> list[Task]:
+        """Return a copy of this pet's task list."""
         return list(self._tasks)
 
 
@@ -47,6 +52,7 @@ class Owner:
         self._pets: list[Pet] = []
 
     def add_pet(self, pet: Pet):
+        """Add a pet to this owner's pet list."""
         self._pets.append(pet)
 
     def get_pet(self) -> Optional[Pet]:
@@ -54,6 +60,7 @@ class Owner:
         return self._pets[0] if self._pets else None
 
     def get_pets(self) -> list[Pet]:
+        """Return a copy of the owner's pet list."""
         return list(self._pets)
 
     def get_all_tasks(self) -> list[Task]:
@@ -72,6 +79,7 @@ class DailyPlan:
     explanation: str = ""
 
     def display(self) -> str:
+        """Render the plan as a formatted text block with scheduled and skipped tasks."""
         lines = [f"Daily Plan — {self.date}", "=" * 35]
         if self.scheduled_tasks:
             lines.append("Scheduled:")
@@ -87,6 +95,7 @@ class DailyPlan:
         return "\n".join(lines)
 
     def get_summary(self) -> str:
+        """Return a one-line summary of how many tasks were scheduled vs skipped."""
         total = len(self.scheduled_tasks) + len(self.unscheduled_tasks)
         skipped = len(self.unscheduled_tasks)
         return (
@@ -119,6 +128,7 @@ class Scheduler:
         return plan
 
     def explain_plan(self, plan: DailyPlan) -> str:
+        """Build a human-readable explanation of why each task was scheduled or skipped."""
         lines = [
             f"{self.owner.name} has {self.owner.available_minutes} min available today.",
             f"{len(plan.scheduled_tasks)} task(s) scheduled in priority order:",
